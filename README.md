@@ -181,16 +181,20 @@ The Jacobian is built **analytically** from these coefficients.
 ## Algorithm at a glance
 
 ```mermaid
+---
+config:
+  htmlLabels: false
+---
 flowchart LR
-    A["Read input"] --> B["Build fixed-point equation"]
-    B --> C["Compute tangent"]
-    C --> D["Predict next point"]
-    D --> E["Newton correction"]
-    E --> F["Compute eigenvalues"]
-    F --> G{"Target λ crossed?"}
-    G -- "No" --> C
-    G -- "Yes" --> H["Refine crossing"]
-    H --> I["Output result"]
+    A["Input"] --> B["Build F"]
+    B --> C["Tangent"]
+    C --> D["Predict"]
+    D --> E["Correct"]
+    E --> F["Eigenvalues"]
+    F --> G{"λ = ±1?"}
+    G -- "no" --> C
+    G -- "yes" --> H["Refine"]
+    H --> I["Output"]
 ```
 
 ---
