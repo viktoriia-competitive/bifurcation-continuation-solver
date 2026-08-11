@@ -1,172 +1,301 @@
-# Bifurcation Continuation Solver
+<p align="center">
+  <img src="assets/hero.png" width="100%" alt="Bifurcation Continuation Solver"/>
+</p>
 
-![Python](https://img.shields.io/badge/Python-3.x-blue)
-![Dependencies](https://img.shields.io/badge/Dependencies-Standard%20Library-green)
-![Topic](https://img.shields.io/badge/Topic-Dynamical%20Systems-purple)
-![Numerics](https://img.shields.io/badge/Numerics-Newton%20%2B%20Continuation-orange)
+<p align="center">
+  <b>Numerical continuation of fixed points in parameter-dependent quadratic maps.</b><br>
+  Follow the branch. Track the spectrum. Detect the bifurcation.
+</p>
 
-A compact numerical continuation script for tracking fixed points of parameter-dependent quadratic maps and detecting when an eigenvalue crosses a selected target value.
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-2.7-3776AB?logo=python&logoColor=white">
+  <img src="https://img.shields.io/badge/dependencies-none-83C167">
+  <img src="https://img.shields.io/badge/continuation_step-0.005-58C4DD">
+  <img src="https://img.shields.io/badge/bifurcations-fold%20%7C%20flip-FC6255">
+</p>
 
-## Overview
+---
 
-This project studies fixed points of a map depending on a continuation parameter.  
-The script treats the unknown vector as:
+## The idea
 
-```text
-p = (x_1, x_2, ..., x_n, parameter)
+We study a discrete dynamical system
+
+\[
+x_{k+1}=f(x_k,\mu),
+\]
+
+where the last variable \(\mu\) is treated as a parameter.
+
+A fixed point satisfies
+
+\[
+f(x,\mu)=x.
+\]
+
+So define
+
+\[
+\boxed{F(x,\mu)=f(x,\mu)-x}.
+\]
+
+Then fixed points are exactly the points satisfying
+
+\[
+\boxed{F(x,\mu)=0}.
+\]
+
+There are \(n\) equations and \(n+1\) unknowns, so—under regularity assumptions—the solutions form a **curve** in state–parameter space.
+
+<p align="center">
+  <img src="assets/continuation.gif" width="82%" alt="Predictor-corrector continuation animation"/>
+</p>
+
+<p align="center">
+  <sub>
+    Yellow: current fixed point · Red: predictor · Green: Newton correction
+  </sub>
+</p>
+
+---
+
+## Following the branch
+
+At a known fixed point \(p\), a tangent vector \(u\) satisfies
+
+\[
+\boxed{DF(p)\,u=0},
+\qquad
+\|u\|_2=1.
+\]
+
+The next point is predicted by
+
+\[
+q=p+\delta u,
+\qquad
+\delta=0.005.
+\]
+
+The predictor is generally not exactly on the fixed-point curve, so Newton's method corrects it back to
+
+\[
+F(p)=0.
+\]
+
+```mermaid
+flowchart LR
+    A["fixed point p"] --> B["tangent<br/>DF(p)u = 0"]
+    B --> C["predict<br/>q = p + δu"]
+    C --> D["Newton<br/>correct"]
+    D --> E["next fixed point"]
+    E --> B
 ```
 
-and solves the fixed-point equations:
+This is why the algorithm can continue through curved branches where using the parameter \(\mu\) alone as the continuation variable would fail.
 
-```text
-F_i(p) = f_i(p) - x_i = 0,   i = 1, ..., n
+---
+
+## Where does the bifurcation appear?
+
+For each fixed point we compute the **state Jacobian**
+
+\[
+J_x=D_xf(x,\mu)
+\]
+
+and its eigenvalues
+
+\[
+\lambda_1,\ldots,\lambda_n.
+\]
+
+The solver searches for one of two spectral events:
+
+<table align="center">
+<tr>
+<td align="center"><b>Fold</b></td>
+<td align="center"><b>Flip / period doubling</b></td>
+</tr>
+<tr>
+<td align="center">\(\lambda=+1\)</td>
+<td align="center">\(\lambda=-1\)</td>
+</tr>
+</table>
+
+<p align="center">
+  <img src="assets/eigenvalue_crossing.gif" width="82%" alt="Eigenvalue crossing animation"/>
+</p>
+
+When the eigenvalue closest to the target crosses it, the solver brackets the event and refines the bifurcation point.
+
+\[
+g(p)=\lambda_{\text{closest}}(p)-\lambda_{\text{target}}.
+\]
+
+A sign change in \(g\) means that the target eigenvalue has been crossed.
+
+---
+
+## Refinement
+
+Once the crossing is detected between two continuation points,
+
+\[
+p_a,\qquad p_b,
+\]
+
+the interval is repeatedly bisected:
+
+\[
+p_m=\frac{p_a+p_b}{2}.
+\]
+
+Each midpoint is corrected back to the fixed-point curve with Newton's method, and its eigenvalues are recomputed.
+
+The implementation performs **100 refinement steps**.
+
+```mermaid
+flowchart TD
+    A["crossing bracketed"] --> B["midpoint"]
+    B --> C["Newton correction"]
+    C --> D["compute eigenvalues"]
+    D --> E{"which side of λ*?"}
+    E --> A
 ```
 
-where each `f_i` is represented as a quadratic polynomial in all `n + 1` variables.
+---
 
-The solution set is generically a one-dimensional curve in `(state, parameter)` space. The script follows this curve using a predictor-corrector method and detects when an eigenvalue of the Jacobian crosses a target value.
+## Quadratic maps
 
-## What the script does
+Every component of \(f\) is a polynomial of degree at most two.
 
-1. Reads a fixed-point continuation problem from standard input.
-2. Infers the dimension `n` from the amount of polynomial coefficient data.
-3. Builds the quadratic monomial basis.
-4. Evaluates the map and its Jacobian.
-5. Computes a tangent direction to the fixed-point curve.
-6. Advances along the curve using a small predictor step.
-7. Corrects back to the curve using Newton's method.
-8. Computes eigenvalues of the state Jacobian.
-9. Detects a sign change relative to the target eigenvalue.
-10. Refines the crossing by bisection.
-11. Prints the detected point and the corresponding eigenvalues.
+For
 
-## Features
+\[
+p=(x_1,\ldots,x_n,\mu)
+\]
 
-- Pure Python implementation
-- No external dependencies
-- Quadratic polynomial map evaluation
-- Analytical Jacobian construction
-- Newton correction with one fixed coordinate
-- Tangent computation from the nullspace of the fixed-point Jacobian
-- Eigenvalue computation for:
-  - one-dimensional systems,
-  - two-dimensional systems,
-  - higher-dimensional systems using QR iteration
-- Bisection refinement of the detected crossing
+the monomial basis is
 
-## Project structure
+\[
+1,\quad
+x_1,\ldots,x_{n+1},\quad
+x_1^2,x_1x_2,\ldots,x_{n+1}^2.
+\]
 
-```text
-bifurcation-continuation-solver/
-├── README.md
-└── bif.py
+Its size is
+
+\[
+\boxed{k=\frac{(n+3)(n+2)}{2}}.
+\]
+
+For \(n=2\), the basis is
+
+\[
+1,x,y,z,x^2,xy,xz,y^2,yz,z^2.
+\]
+
+The Jacobian is constructed **analytically** from these coefficients—no finite differences are needed.
+
+---
+
+## Algorithm at a glance
+
+```mermaid
+flowchart TD
+    A["read input"] --> B["build quadratic map"]
+    B --> C["F = f − x"]
+    C --> D["compute tangent"]
+    D --> E["predict"]
+    E --> F["Newton correct"]
+    F --> G["compute eigenvalues of Dₓf"]
+    G --> H{"λ crossed ±1?"}
+    H -- no --> D
+    H -- yes --> I["bisection + Newton refinement"]
+    I --> J["print bifurcation point"]
 ```
 
-## Input format
+---
 
-The script reads all input from `stdin`.
+## Example — Hénon-type map
 
-The expected data layout is:
+\[
+f(x,y,z)=
+\left(
+1+y-\frac12x^2,\,
+xz
+\right).
+\]
 
-```text
-p0_1 p0_2 ... p0_(n+1)
-coefficients for f_1
-coefficients for f_2
-...
-coefficients for f_n
-direction
-target_lambda
-```
+Start from
 
-The script infers `n` automatically.
+\[
+(x,y,z)=(-1,-1.5,1.5)
+\]
 
-For a system of dimension `n`, the polynomial is evaluated in `m = n + 1` variables.  
-The quadratic basis contains:
+and search for a **flip bifurcation**
 
-```text
-1
-p_1, ..., p_m
-p_1 p_1, p_1 p_2, ..., p_m p_m
-```
+\[
+\lambda=-1.
+\]
 
-The number of coefficients for each component is:
+The solver finds approximately
 
-```text
-k = (n + 3)(n + 2) / 2
-```
+\[
+\boxed{
+(x,y,z)=
+(-0.816496580927726,\,
+-1.483163247594393,\,
+1.816496580927726)
+}
+\]
 
-Each map component `f_i` must therefore provide exactly `k` coefficients.
+with eigenvalues
 
-## Output format
+\[
+\boxed{
+-1,\qquad
+1.816496580927726
+}.
+\]
 
-The script prints two lines:
+So the first eigenvalue reaches exactly the flip threshold.
 
-1. The detected point on the fixed-point curve:
+---
 
-```text
-x_1 x_2 ... x_n parameter
-```
-
-2. The eigenvalues of the state Jacobian at that point:
-
-```text
-lambda_1 lambda_2 ... lambda_n
-```
-
-All values are printed in high-precision scientific notation.
-
-## Running the script
+## Run
 
 ```bash
 python bif.py < input.txt
 ```
 
-Example:
+No external dependencies are required.
 
-```bash
-python bif.py < examples/problem_01.txt
-```
+---
 
-## Numerical method
+## Numerical ingredients
 
-### Predictor
+| Component | Method |
+|---|---|
+| Fixed-point equation | \(F=f-x\) |
+| Branch direction | nullspace of \(DF\) |
+| Predictor | \(p+\delta u\) |
+| Corrector | Newton method |
+| Linear systems | Gaussian elimination |
+| \(n=1\) eigenvalues | direct |
+| \(n=2\) eigenvalues | analytical formula |
+| \(n>2\) eigenvalues | QR iteration |
+| Bifurcation detection | eigenvalue crossing |
+| Final localization | bisection + Newton |
+| Output | 17-digit scientific notation |
 
-A tangent vector is computed from the Jacobian of the fixed-point equation.  
-The algorithm chooses a coordinate chart by fixing the coordinate with the largest tangent component.
+---
 
-### Corrector
+<p align="center">
+  <b>The geometry tells us where to move.</b><br>
+  <b>The spectrum tells us when the dynamics change.</b>
+</p>
 
-Newton's method corrects the predicted point back to the fixed-point curve while holding one coordinate fixed.
-
-### Detection
-
-At each continuation step, the script compares the closest eigenvalue to the target value.  
-When the sign changes, the crossing is refined by repeated bisection.
-
-## Important implementation details
-
-- The continuation step is fixed at `delta = 0.005`.
-- Newton's method runs for at most 60 iterations.
-- The main continuation loop allows up to 200,000 predictor-corrector steps.
-- Bisection uses 100 refinement iterations.
-- The target eigenvalue is parsed as an integer in the current version.
-
-## Limitations
-
-- The script is designed for real-valued computations.
-- Complex eigenvalues are not handled explicitly.
-- The QR eigenvalue routine is a simple educational implementation.
-- There is limited input validation.
-- The fixed step size may be inefficient for stiff or sharply curved branches.
-- The script stops after detecting the first crossing.
-
-## Future improvements
-
-- Add adaptive step-size control.
-- Add support for complex eigenvalues.
-- Add command-line arguments.
-- Add structured JSON or YAML input.
-- Add example input files.
-- Add plotting of the continuation curve.
-- Replace the custom linear algebra with NumPy for robustness.
-- Add tests for polynomial basis generation, Jacobians, and Newton correction.
+<p align="center">
+  <sub>Numerical continuation · fixed points · eigenvalues · bifurcations</sub>
+</p>
