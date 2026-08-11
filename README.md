@@ -78,6 +78,10 @@ $$
 Newton's method then brings the predicted point back to the curve $F=0$.
 
 ```mermaid
+---
+config:
+  htmlLabels: false
+---
 flowchart LR
     A["Fixed point"] --> B["Tangent"]
     B --> C["Predict"]
@@ -134,6 +138,10 @@ The midpoint is corrected with Newton's method and the eigenvalues are recompute
 The implementation performs **100 refinement iterations**.
 
 ```mermaid
+---
+config:
+  htmlLabels: false
+---
 flowchart LR
     A["Bracket"] --> B["Midpoint"]
     B --> C["Newton"]
